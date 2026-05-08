@@ -3,7 +3,7 @@ import { CurrencyPipe } from '@angular/common';
 import { Apollo } from 'apollo-angular';
 import { inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map } from 'rxjs/operators';
+import { switchMap, map, filter } from 'rxjs/operators';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { GET_PRODUCT } from '../../graphql/queries';
 import { ADD_TO_ORDER } from '../../graphql/mutations';
@@ -51,8 +51,9 @@ export class ListingDetailComponent {
 
   product = toSignal(
     toObservable(this.id).pipe(
+      filter(slug => !!slug),
       switchMap(slug => this.apollo.watchQuery({ query: GET_PRODUCT, variables: { slug } }).valueChanges),
-      map((r: any) => r.data.product),
+      map((r: any) => r.data?.product ?? null),
     ),
     { initialValue: null },
   );
