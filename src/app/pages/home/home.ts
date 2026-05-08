@@ -56,7 +56,7 @@ export class HomeComponent {
     this.apollo.watchQuery({
       query: GET_PRODUCTS,
       variables: { options: { take: 8, sort: { createdAt: 'DESC' } } },
-    }).valueChanges.pipe(map((r: any) => r.data.products.items)),
+    }).valueChanges.pipe(map((r: any) => r.data?.products?.items ?? [])),
     { initialValue: [] },
   );
 }
