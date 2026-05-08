@@ -111,3 +111,29 @@ export const REMOVE_SETUP_SHEET = gql`
     removeSetupSheet(id: $id)
   }
 `;
+
+export const CREATE_LISTING = gql`
+  mutation CreateListing($input: CreateListingInput!) {
+    createListing(input: $input) {
+      id
+      name
+      slug
+    }
+  }
+`;
+
+export const UPDATE_LISTING = gql`
+  mutation UpdateListing($input: UpdateListingInput!) {
+    updateListing(input: $input) {
+      id
+      name
+      slug
+    }
+  }
+`;
+
+export const DELETE_LISTING = gql`
+  mutation DeleteListing($id: ID!) {
+    deleteListing(id: $id)
+  }
+`;

@@ -37,6 +37,7 @@ export class AuthService {
   logout() {
     return this.apollo.mutate({ mutation: LOGOUT }).pipe(
       tap(() => {
+        localStorage.removeItem('vendure-auth-token');
         this._customer.set(null);
         this.apollo.client.clearStore();
         this.router.navigate(['/']);

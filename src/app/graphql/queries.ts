@@ -124,6 +124,24 @@ export const GET_ACTIVE_CUSTOMER = gql`
   }
 `;
 
+export const GET_MY_LISTINGS = gql`
+  query MyListings {
+    myListings {
+      id
+      name
+      slug
+      variants { id price currencyCode }
+      customFields {
+        condition
+        rcClass
+        driveType
+        brand
+        model
+      }
+    }
+  }
+`;
+
 export const GET_ACTIVE_ORDER = gql`
   query ActiveOrder {
     activeOrder {
