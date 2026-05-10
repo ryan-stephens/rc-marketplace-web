@@ -1,11 +1,11 @@
-import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, OnInit, signal, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { Apollo } from 'apollo-angular';
-import { inject } from '@angular/core';
-import { CREATE_LISTING } from '../../graphql/mutations';
-import { AuthService } from '../../services/auth.service';
 import { RouterLink } from '@angular/router';
+import { Store } from '@ngrx/store';
+import { AuthService } from '../../services/auth.service';
+import { ListingsActions } from '../../store/listings/listings.actions';
+import { selectSubmitting, selectCreateSuccess, selectError } from '../../store/listings/listings.selectors';
+import type { CreateListingInput } from '../../../gql/graphql';
 
 @Component({
   selector: 'app-sell',
@@ -31,6 +31,15 @@ import { RouterLink } from '@angular/router';
             </div>
           </div>
         } @else {
+          @if (fromGarageCar()) {
+            <div class="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-5">
+              <span class="text-blue-500 text-lg leading-none">🏎</span>
+              <div>
+                <p class="text-sm font-medium text-blue-800">Pre-filled from your garage: {{ fromGarageCar() }}</p>
+                <p class="text-xs text-blue-600 mt-0.5">Add a price, condition, and PayPal email to publish.</p>
+              </div>
+            </div>
+          }
           <form (ngSubmit)="submit()" class="space-y-5">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
@@ -112,9 +121,8 @@ import { RouterLink } from '@angular/router';
                 placeholder="Describe condition, included items, build history..."></textarea>
             </div>
 
-            @if (error()) {
-              <p class="text-red-600 text-sm">{{ error() }}</p>
-            }
+            @if (formError()) { <p class="text-red-600 text-sm">{{ formError() }}</p> }
+            @if (error()) { <p class="text-red-600 text-sm">{{ error() }}</p> }
 
             <button type="submit" [disabled]="submitting()"
               class="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50">
@@ -126,56 +134,58 @@ import { RouterLink } from '@angular/router';
     </div>
   `,
 })
-export class SellComponent {
+export class SellComponent implements OnInit {
   auth = inject(AuthService);
-  private apollo = inject(Apollo);
-  private router = inject(Router);
+  private store = inject(Store);
+
+  submitting = this.store.selectSignal(selectSubmitting);
+  error = this.store.selectSignal(selectError);
+  success = this.store.selectSignal(selectCreateSuccess);
 
   listing: any = {};
-  submitting = signal(false);
-  error = signal('');
-  success = signal(false);
+  formError = signal('');
+  fromGarageCar = signal<string | null>(null);
+
+  ngOnInit() {
+    this.store.dispatch(ListingsActions.resetCreate());
+    const state = history.state?.fromGarage;
+    if (state) {
+      this.listing = {
+        name: state.name ?? '',
+        brand: state.brand ?? '',
+        model: state.model ?? '',
+        rcClass: state.rcClass ?? '',
+        driveType: state.driveType ?? '',
+        description: state.notes ?? '',
+      };
+      this.fromGarageCar.set(state.name);
+    }
+  }
 
   submit() {
     if (!this.listing.name || !this.listing.condition || !this.listing.priceDisplay || !this.listing.paypalEmail) {
-      this.error.set('Please fill in all required fields.');
+      this.formError.set('Please fill in all required fields.');
       return;
     }
-
-    this.submitting.set(true);
-    this.error.set('');
-
-    this.apollo.mutate({
-      mutation: CREATE_LISTING,
-      variables: {
-        input: {
-          name: this.listing.name,
-          description: this.listing.description,
-          price: Math.round(Number(this.listing.priceDisplay) * 100),
-          brand: this.listing.brand || undefined,
-          model: this.listing.model || undefined,
-          rcClass: this.listing.rcClass || undefined,
-          driveType: this.listing.driveType || undefined,
-          condition: this.listing.condition,
-          surfaceType: this.listing.surfaceType || undefined,
-          paypalEmail: this.listing.paypalEmail,
-        },
-      },
-    }).subscribe({
-      next: () => {
-        this.submitting.set(false);
-        this.success.set(true);
-      },
-      error: (err) => {
-        this.submitting.set(false);
-        this.error.set(err.message ?? 'Something went wrong.');
-      },
-    });
+    this.formError.set('');
+    const input: CreateListingInput = {
+      name: this.listing.name,
+      condition: this.listing.condition,
+      price: Math.round(Number(this.listing.priceDisplay) * 100),
+      paypalEmail: this.listing.paypalEmail,
+      description: this.listing.description || null,
+      brand: this.listing.brand || null,
+      model: this.listing.model || null,
+      rcClass: this.listing.rcClass || null,
+      driveType: this.listing.driveType || null,
+      surfaceType: this.listing.surfaceType || null,
+    };
+    this.store.dispatch(ListingsActions.createListing({ input }));
   }
 
   reset() {
     this.listing = {};
-    this.success.set(false);
-    this.error.set('');
+    this.formError.set('');
+    this.store.dispatch(ListingsActions.resetCreate());
   }
 }

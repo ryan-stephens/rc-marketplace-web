@@ -1,21 +1,81 @@
 import { Component, ChangeDetectionStrategy, input, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Apollo } from 'apollo-angular';
 import { inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
 import { GET_MY_GARAGE } from '../../graphql/queries';
-import { ADD_SETUP_SHEET, REMOVE_SETUP_SHEET } from '../../graphql/mutations';
+import { ADD_SETUP_SHEET, REMOVE_SETUP_SHEET, CREATE_LISTING, UPDATE_GARAGE_CAR } from '../../graphql/mutations';
+import { AuthService } from '../../services/auth.service';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-garage-car',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="max-w-3xl mx-auto px-4 py-8">
       @if (car(); as c) {
         <h1 class="text-2xl font-bold mb-1">{{ c.name }}</h1>
         @if (c.brand || c.model) { <p class="text-gray-500 mb-6">{{ c.brand }} {{ c.model }}</p> }
+
+        <!-- Quick-list form -->
+        @if (!c.listingProductId) {
+          <div class="border rounded-lg mb-6 overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 bg-gray-50">
+              <p class="text-sm font-medium text-gray-700">List for Sale</p>
+              <button (click)="toggleQuickList()"
+                class="text-xs text-gray-500 hover:text-gray-800">
+                {{ showQuickList() ? 'Cancel' : 'Set price & publish →' }}
+              </button>
+            </div>
+            @if (showQuickList()) {
+              <div class="p-4 border-t">
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label class="text-xs font-medium text-gray-600">Price (USD) *</label>
+                    <div class="relative mt-1">
+                      <span class="absolute left-2 top-1.5 text-gray-400 text-xs">$</span>
+                      <input [(ngModel)]="quickList.price" name="ql-price"
+                        type="number" min="1" placeholder="0"
+                        class="w-full border rounded px-2 pl-5 py-1.5 text-sm">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium text-gray-600">Condition *</label>
+                    <select [(ngModel)]="quickList.condition" name="ql-condition"
+                      class="w-full border rounded px-2 py-1.5 text-sm mt-1">
+                      <option value="">Select...</option>
+                      <option value="new">New</option>
+                      <option value="used_like_new">Like New</option>
+                      <option value="used_good">Good</option>
+                      <option value="used_fair">Fair</option>
+                      <option value="parts">Parts</option>
+                    </select>
+                  </div>
+                  <div class="col-span-2">
+                    <label class="text-xs font-medium text-gray-600">Your PayPal Email *</label>
+                    <input [(ngModel)]="quickList.paypalEmail" name="ql-paypal"
+                      type="email" placeholder="you@paypal.com"
+                      class="w-full border rounded px-2 py-1.5 text-sm mt-1">
+                  </div>
+                </div>
+                @if (quickListError()) {
+                  <p class="text-red-600 text-xs mb-2">{{ quickListError() }}</p>
+                }
+                <button (click)="publishListing(c)" [disabled]="quickListSubmitting()"
+                  class="w-full bg-green-600 text-white py-2 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                  {{ quickListSubmitting() ? 'Publishing...' : 'Publish Listing' }}
+                </button>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="border border-green-200 bg-green-50 rounded-lg px-4 py-3 mb-6 flex items-center justify-between">
+            <p class="text-sm text-green-800 font-medium">Listed successfully!</p>
+            <a routerLink="/listings" class="text-sm text-green-700 underline">View on marketplace →</a>
+          </div>
+        }
 
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold">Setup Sheets</h2>
@@ -102,15 +162,71 @@ export class GarageCarComponent {
   carId = input<string>('');
   showAdd = signal(false);
   sheet: any = {};
+  showQuickList = signal(false);
+  quickList: any = {};
+  quickListSubmitting = signal(false);
+  quickListError = signal('');
 
   private apollo = inject(Apollo);
+  private auth = inject(AuthService);
 
   private allCars = toSignal(
-    this.apollo.watchQuery({ query: GET_MY_GARAGE }).valueChanges.pipe(map((r: any) => r.data.myGarage)),
+    this.apollo.watchQuery({ query: GET_MY_GARAGE }).valueChanges.pipe(map((r: any) => r.data?.myGarage ?? [])),
     { initialValue: [] as any[] },
   );
 
   car = () => this.allCars().find((c: any) => c.id === this.carId()) ?? null;
+
+  toggleQuickList() {
+    if (!this.showQuickList()) {
+      this.quickList = { paypalEmail: (this.auth.customer() as any)?.customFields?.paypalEmail ?? '' };
+      this.quickListError.set('');
+    }
+    this.showQuickList.update(v => !v);
+  }
+
+  publishListing(car: any) {
+    if (!this.quickList.price || !this.quickList.condition || !this.quickList.paypalEmail) {
+      this.quickListError.set('Price, condition, and PayPal email are required.');
+      return;
+    }
+    this.quickListSubmitting.set(true);
+    this.quickListError.set('');
+
+    this.apollo.mutate({
+      mutation: CREATE_LISTING,
+      variables: {
+        input: {
+          name: car.name,
+          brand: car.brand || undefined,
+          model: car.model || undefined,
+          rcClass: car.rcClass || undefined,
+          driveType: car.driveType || undefined,
+          description: car.notes || undefined,
+          condition: this.quickList.condition,
+          price: Math.round(Number(this.quickList.price) * 100),
+          paypalEmail: this.quickList.paypalEmail,
+        },
+      },
+    }).subscribe({
+      next: (res: any) => {
+        const productId = res.data?.createListing?.id;
+        this.quickListSubmitting.set(false);
+        this.showQuickList.set(false);
+        if (productId) {
+          this.apollo.mutate({
+            mutation: UPDATE_GARAGE_CAR,
+            variables: { input: { id: car.id, listingProductId: String(productId) } },
+            refetchQueries: [{ query: GET_MY_GARAGE }],
+          }).subscribe();
+        }
+      },
+      error: (err) => {
+        this.quickListSubmitting.set(false);
+        this.quickListError.set(err.message ?? 'Something went wrong.');
+      },
+    });
+  }
 
   addSheet(carId: string) {
     this.apollo.mutate({

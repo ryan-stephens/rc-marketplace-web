@@ -36,6 +36,12 @@
           },
           "configurations": {
             "production": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.prod.ts"
+                }
+              ],
               "budgets": [
                 {
                   "type": "initial",
@@ -65,7 +71,8 @@
               "buildTarget": "rc-marketplace-web:build:production"
             },
             "development": {
-              "buildTarget": "rc-marketplace-web:build:development"
+              "buildTarget": "rc-marketplace-web:build:development",
+              "proxyConfig": "proxy.conf.json"
             }
           },
           "defaultConfiguration": "development"

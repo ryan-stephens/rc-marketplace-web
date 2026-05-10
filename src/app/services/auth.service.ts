@@ -1,47 +1,42 @@
-import { Injectable, signal, computed } from '@angular/core';
-import { Apollo } from 'apollo-angular';
-import { Router } from '@angular/router';
-import { map, tap } from 'rxjs/operators';
-import { GET_ACTIVE_CUSTOMER } from '../graphql/queries';
-import { LOGIN, LOGOUT } from '../graphql/mutations';
+import { inject, Injectable } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { AuthActions } from '../store/auth/auth.actions';
+import {
+  selectCustomer,
+  selectIsLoggedIn,
+  selectLoaded,
+  selectLoading,
+  selectError,
+} from '../store/auth/auth.selectors';
 
+/**
+ * Thin facade over the auth NgRx feature store.
+ * Exposes the same signal-based API as before — all consumers unchanged.
+ * All side effects (Apollo calls, localStorage, navigation) live in AuthEffects.
+ */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private _customer = signal<any | null>(null);
+  private store = inject(Store);
 
-  readonly customer = this._customer.asReadonly();
-  readonly isLoggedIn = computed(() => this._customer() !== null);
+  readonly customer = this.store.selectSignal(selectCustomer);
+  readonly isLoggedIn = this.store.selectSignal(selectIsLoggedIn);
+  readonly loaded = this.store.selectSignal(selectLoaded);
+  readonly loading = this.store.selectSignal(selectLoading);
+  readonly error = this.store.selectSignal(selectError);
 
-  constructor(private apollo: Apollo, private router: Router) {
-    this.fetchCurrentUser();
+  constructor() {
+    this.store.dispatch(AuthActions.fetchCurrentUser());
   }
 
-  fetchCurrentUser() {
-    this.apollo.query({ query: GET_ACTIVE_CUSTOMER, fetchPolicy: 'network-only' })
-      .subscribe(({ data }: any) => {
-        this._customer.set(data.activeCustomer ?? null);
-      });
+  login(email: string, password: string): void {
+    this.store.dispatch(AuthActions.login({ email, password }));
   }
 
-  login(username: string, password: string) {
-    return this.apollo.mutate({ mutation: LOGIN, variables: { username, password } }).pipe(
-      map((res: any) => res.data.login),
-      tap(result => {
-        if (result.__typename === 'CurrentUser') {
-          this.fetchCurrentUser();
-        }
-      }),
-    );
+  register(firstName: string, lastName: string, email: string, password: string): void {
+    this.store.dispatch(AuthActions.register({ firstName, lastName, email, password }));
   }
 
-  logout() {
-    return this.apollo.mutate({ mutation: LOGOUT }).pipe(
-      tap(() => {
-        localStorage.removeItem('vendure-auth-token');
-        this._customer.set(null);
-        this.apollo.client.clearStore();
-        this.router.navigate(['/']);
-      }),
-    );
+  logout(): void {
+    this.store.dispatch(AuthActions.logout());
   }
 }

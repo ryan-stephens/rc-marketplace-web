@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -15,15 +16,32 @@ export const routes: Routes = [
   },
   {
     path: 'sell',
+    canActivate: [authGuard],
     loadComponent: () => import('./pages/sell/sell').then(m => m.SellComponent),
   },
   {
     path: 'garage',
+    canActivate: [authGuard],
     loadComponent: () => import('./pages/garage/garage').then(m => m.GarageComponent),
   },
   {
     path: 'garage/:carId',
+    canActivate: [authGuard],
     loadComponent: () => import('./pages/garage-car/garage-car').then(m => m.GarageCarComponent),
+  },
+  {
+    path: 'my-listings',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/my-listings/my-listings').then(m => m.MyListingsComponent),
+  },
+  {
+    path: 'my-sales',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/my-sales/my-sales').then(m => m.MySalesComponent),
+  },
+  {
+    path: 'garages',
+    loadComponent: () => import('./pages/garages/garages').then(m => m.GaragesComponent),
   },
   {
     path: 'profile/:userId',
@@ -31,10 +49,17 @@ export const routes: Routes = [
   },
   {
     path: 'orders',
+    canActivate: [authGuard],
     loadComponent: () => import('./pages/orders/orders').then(m => m.OrdersComponent),
   },
   {
+    path: 'checkout/confirm',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/checkout-confirm/checkout-confirm').then(m => m.CheckoutConfirmComponent),
+  },
+  {
     path: 'checkout',
+    canActivate: [authGuard],
     loadComponent: () => import('./pages/checkout/checkout').then(m => m.CheckoutComponent),
   },
   {

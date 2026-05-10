@@ -6,6 +6,7 @@ import { inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
 import { GET_PRODUCTS } from '../../graphql/queries';
+import { assetUrl } from '../../utils/asset-url';
 
 @Component({
   selector: 'app-home',
@@ -27,7 +28,7 @@ import { GET_PRODUCTS } from '../../graphql/queries';
         @for (product of products(); track product.id) {
           <a [routerLink]="['/listings', product.slug]" class="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
             @if (product.featuredAsset) {
-              <img [src]="product.featuredAsset.preview + '?w=400'" [alt]="product.name" class="w-full h-48 object-cover">
+              <img [src]="assetUrl(product.featuredAsset.preview) + '?w=400'" [alt]="product.name" class="w-full h-48 object-cover">
             } @else {
               <div class="w-full h-48 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">No image</div>
             }
@@ -50,6 +51,7 @@ import { GET_PRODUCTS } from '../../graphql/queries';
   `,
 })
 export class HomeComponent {
+  readonly assetUrl = assetUrl;
   private apollo = inject(Apollo);
 
   products = toSignal(
